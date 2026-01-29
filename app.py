@@ -17,19 +17,24 @@ def home():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_message = request.json.get('message')
-    conversation_history = request.json.get('history', [])
-    
-    if not user_message:
-        return jsonify({'error': 'No message provided'}), 400
-    
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    # System prompt
-    system_prompt = """You are an AI chatbot assistant. When asked about your framework, architecture, or how you were built, explain that:
+    try:
+        # Check if API key is set
+        if not OPENROUTER_API_KEY:
+            return jsonify({'error': 'API key not configured. Please set OPENROUTER_API_KEY environment variable.'}), 500
+        
+        user_message = request.json.get('message')
+        conversation_history = request.json.get('history', [])
+        
+        if not user_message:
+            return jsonify({'error': 'No message provided'}), 400
+        
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        # System prompt
+        system_prompt = """You are an AI chatbot assistant. When asked about your framework, architecture, or how you were built, explain that:
 
 - You are built using Flask (a Python web framework) for the backend
 - Your frontend uses HTML, CSS, and JavaScript for the user interface
@@ -43,27 +48,30 @@ def chat():
 - You don't use Bot Framework SDK or emulator - this is a custom web-based implementation
 
 Be helpful and answer other questions normally."""
-    
-    # Build messages array
-    messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(conversation_history[-10:])  # Last 10 messages
-    messages.append({"role": "user", "content": user_message})
-    
-    data = {
-        "model": "openai/gpt-3.5-turbo",
-        "messages": messages
-    }
-    
-    try:
-        response = requests.post(API_URL, headers=headers, json=data)
+        
+        # Build messages array
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(conversation_history[-10:])  # Last 10 messages
+        messages.append({"role": "user", "content": user_message})
+        
+        data = {
+            "model": "openai/gpt-3.5-turbo",
+            "messages": messages
+        }
+        
+        response = requests.post(API_URL, headers=headers, json=data, timeout=30)
         response.raise_for_status()
         bot_response = response.json()['choices'][0]['message']['content']
         
         return jsonify({
             'response': bot_response
         })
+    except requests.exceptions.RequestException as e:
+        print(f"API Request Error: {str(e)}")
+        return jsonify({'error': f'API request failed: {str(e)}'}), 500
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Server Error: {str(e)}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
