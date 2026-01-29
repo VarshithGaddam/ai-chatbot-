@@ -1,3 +1,4 @@
+let conversations = JSON.parse(localStorage.getItem('conversations') || '{}');
 let currentConversationId = null;
 
 // Load conversations on page load
@@ -15,6 +16,24 @@ function sendMessage() {
     addMessage(message, 'user-message');
     input.value = '';
     
+    // Create new conversation if none exists
+    if (!currentConversationId) {
+        currentConversationId = Date.now().toString();
+        conversations[currentConversationId] = {
+            id: currentConversationId,
+            title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
+            messages: [],
+            created_at: new Date().toISOString()
+        };
+    }
+    
+    // Add user message to conversation
+    conversations[currentConversationId].messages.push({
+        role: 'user',
+        content: message
+    });
+    saveConversations();
+    
     // Send to backend
     fetch('/chat', {
         method: 'POST',
@@ -23,14 +42,18 @@ function sendMessage() {
         },
         body: JSON.stringify({ 
             message: message,
-            conversation_id: currentConversationId
+            history: conversations[currentConversationId].messages
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.response) {
             addMessage(data.response, 'bot-message');
-            currentConversationId = data.conversation_id;
+            conversations[currentConversationId].messages.push({
+                role: 'assistant',
+                content: data.response
+            });
+            saveConversations();
             loadConversations();
         } else {
             addMessage('Sorry, something went wrong.', 'bot-message');
@@ -66,72 +89,71 @@ function newConversation() {
     });
 }
 
+function saveConversations() {
+    localStorage.setItem('conversations', JSON.stringify(conversations));
+}
+
 function loadConversations() {
-    fetch('/conversations')
-        .then(response => response.json())
-        .then(data => {
-            const listDiv = document.getElementById('conversationsList');
-            listDiv.innerHTML = '';
-            
-            data.conversations.forEach(conv => {
-                const convDiv = document.createElement('div');
-                convDiv.className = 'conversation-item';
-                if (conv.id === currentConversationId) {
-                    convDiv.className += ' active';
-                }
-                
-                const titleSpan = document.createElement('span');
-                titleSpan.textContent = conv.title;
-                titleSpan.style.flex = '1';
-                titleSpan.onclick = () => loadConversation(conv.id);
-                
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-conv-btn';
-                deleteBtn.innerHTML = '×';
-                deleteBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    deleteConversation(conv.id);
-                };
-                
-                convDiv.appendChild(titleSpan);
-                convDiv.appendChild(deleteBtn);
-                listDiv.appendChild(convDiv);
-            });
-        });
+    conversations = JSON.parse(localStorage.getItem('conversations') || '{}');
+    const listDiv = document.getElementById('conversationsList');
+    listDiv.innerHTML = '';
+    
+    const convArray = Object.values(conversations).sort((a, b) => 
+        new Date(b.created_at) - new Date(a.created_at)
+    );
+    
+    convArray.forEach(conv => {
+        const convDiv = document.createElement('div');
+        convDiv.className = 'conversation-item';
+        if (conv.id === currentConversationId) {
+            convDiv.className += ' active';
+        }
+        
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = conv.title;
+        titleSpan.style.flex = '1';
+        titleSpan.onclick = () => loadConversation(conv.id);
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-conv-btn';
+        deleteBtn.innerHTML = '×';
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteConversation(conv.id);
+        };
+        
+        convDiv.appendChild(titleSpan);
+        convDiv.appendChild(deleteBtn);
+        listDiv.appendChild(convDiv);
+    });
 }
 
 function loadConversation(convId) {
-    fetch(`/conversation/${convId}`)
-        .then(response => response.json())
-        .then(data => {
-            currentConversationId = convId;
-            const messagesDiv = document.getElementById('chatMessages');
-            messagesDiv.innerHTML = '';
-            
-            data.messages.forEach(msg => {
-                if (msg.role === 'user') {
-                    addMessage(msg.content, 'user-message');
-                } else if (msg.role === 'assistant') {
-                    addMessage(msg.content, 'bot-message');
-                }
-            });
-            
-            loadConversations();
-        });
+    currentConversationId = convId;
+    const messagesDiv = document.getElementById('chatMessages');
+    messagesDiv.innerHTML = '';
+    
+    const conv = conversations[convId];
+    conv.messages.forEach(msg => {
+        if (msg.role === 'user') {
+            addMessage(msg.content, 'user-message');
+        } else if (msg.role === 'assistant') {
+            addMessage(msg.content, 'bot-message');
+        }
+    });
+    
+    loadConversations();
 }
 
 function deleteConversation(convId) {
     if (confirm('Delete this conversation?')) {
-        fetch(`/conversation/${convId}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (currentConversationId === convId) {
-                newConversation();
-            }
-            loadConversations();
-        });
+        delete conversations[convId];
+        saveConversations();
+        
+        if (currentConversationId === convId) {
+            newConversation();
+        }
+        loadConversations();
     }
 }
 
