@@ -9,17 +9,33 @@ A simple chatbot application built with Flask and OpenRouter API using GPT-3.5 T
 pip install -r requirements.txt
 ```
 
-## Running the Application
+## Running the Application Locally
 
-1. Run the Flask app:
+1. Set your API key as environment variable:
+```bash
+# Windows CMD
+set OPENROUTER_API_KEY=your_api_key_here
+
+# Windows PowerShell
+$env:OPENROUTER_API_KEY="your_api_key_here"
+
+# Linux/Mac
+export OPENROUTER_API_KEY=your_api_key_here
+```
+
+2. Run the Flask app:
 ```
 python app.py
 ```
 
-2. Open your browser and go to:
+3. Open your browser and go to:
 ```
 http://127.0.0.1:5000
 ```
+
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions to Render, Heroku, Railway, or PythonAnywhere.
 
 ## Features
 

@@ -3,12 +3,16 @@ import requests
 import secrets
 import uuid
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)  # For session management
 
 # OpenRouter API configuration
-OPENROUTER_API_KEY = "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"
+import os
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Store conversations in session
@@ -135,4 +139,5 @@ def delete_conversation(conv_id):
     return jsonify({'status': 'success'})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
